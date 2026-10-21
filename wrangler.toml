@@ -1,0 +1,12 @@
+name = "unitedcars"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+[assets]
+directory = "./"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "unitedcars-keys"
+database_id = "ac2cf0fc-8d5d-4dd8-a0be-097f28c18a6c"
