@@ -2,19 +2,18 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // 1. API для проверки ключа (ключ берем прямо из ссылки)
     if (url.pathname === '/api/check-key' && request.method === 'POST') {
       try {
         const inputKey = url.searchParams.get('key');
         
         if (!inputKey) {
-           return new Response('No key provided', { status: 400 });
+           return new Response(JSON.stringify({ valid: false, error: "No key" }), { status: 400 });
         }
 
-        // Ищем в базе
+        // Ищем ключ, убирая лишние пробелы в самой базе через TRIM, на случай если они там есть
         const result = await env.DB
-          .prepare("SELECT * FROM access_keys WHERE key = ? AND active = 1")
-          .bind(inputKey)
+          .prepare("SELECT * FROM access_keys WHERE TRIM(key) = ? AND active = 1")
+          .bind(inputKey.trim())
           .first();
         
         return new Response(JSON.stringify({ valid: !!result }), {
@@ -27,7 +26,6 @@ export default {
       }
     }
 
-    // 2. Отдаем сайт
     return env.ASSETS.fetch(request);
   }
 };
