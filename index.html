@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7">
+<title>Carshare Access</title>
+<script async src="https://docs.opencv.org/4.10.0/opencv.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bg:#f5f5f7; --bg-elev:#ffffff;
+  --text:#1d1d1f; --text-2:#6e6e73; --text-3:#a1a1a6;
+  --accent:#0071e3; --accent-soft:rgba(0,113,227,0.1);
+  --glass:rgba(255,255,255,0.6); --glass-border:rgba(255,255,255,0.8);
+  --glass-shadow:0 4px 24px rgba(0,0,0,0.06);
+  --card:#ffffff; --border:rgba(0,0,0,0.07);
+  --danger:#ff3b30; --success:#30d158;
+  --nav-bg:rgba(255,255,255,0.78); --track:rgba(0,0,0,0.06);
+}
+[data-theme="dark"]{
+  --bg:#000; --bg-elev:#1c1c1e;
+  --text:#f5f5f7; --text-2:#98989d; --text-3:#5a5a5f;
+  --accent:#0a84ff; --accent-soft:rgba(10,132,255,0.15);
+  --glass:rgba(28,28,30,0.6); --glass-border:rgba(255,255,255,0.1);
+  --glass-shadow:0 4px 24px rgba(0,0,0,0.4);
+  --card:#1c1c1e; --border:rgba(255,255,255,0.08);
+  --nav-bg:rgba(28,28,30,0.78); --track:rgba(255,255,255,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;
+  transition:background .35s ease,color .35s ease;
+  -webkit-font-smoothing:antialiased;letter-spacing:-0.01em;
+}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;z-index:1;padding:24px 20px calc(104px + env(safe-area-inset-bottom));overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.screen.active{display:flex;}
+.screen::-webkit-scrollbar{display:none;}
+
+/* AUTH */
+#screen-auth{justify-content:center;align-items:center;text-align:center;padding-bottom:24px;}
+.brand{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-bottom:20px;}
+h1.title{font-size:40px;font-weight:700;letter-spacing:-.035em;margin-bottom:10px;line-height:1.05;}
+p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px;line-height:1.45;}
+.auth-card{width:100%;max-width:400px;background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:26px;padding:26px 22px;box-shadow:var(--glass-shadow);}
+.field{margin-bottom:14px;text-align:left;}
+.field label{display:block;font-size:12.5px;font-weight:500;color:var(--text-2);margin-bottom:7px;padding-left:4px;}
+.field input{width:100%;padding:15px 17px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;font-size:16px;color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;font-family:inherit;letter-spacing:-.01em;}
+.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+.field input::placeholder{color:var(--text-3);}
+.btn-primary{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:6px;transition:transform .12s,opacity .2s,filter .2s;letter-spacing:-.01em;}
+.btn-primary:active{transform:scale(.985);filter:brightness(1.08);}
+.btn-primary:disabled{opacity:.4;cursor:default;}
+.auth-foot{margin-top:18px;font-size:12px;color:var(--text-3);line-height:1.5;padding:0 6px;}
+
+/* SCAN */
+#screen-scan{justify-content:center;}
+.page-head{width:100%;text-align:center;margin-bottom:32px;}
+.page-head h2{font-size:30px;font-weight:700;letter-spacing:-.03em;margin-bottom:8px;}
+.page-head p{font-size:15px;color:var(--text-2);line-height:1.45;max-width:320px;margin:0 auto;}
+.scan-zone{width:100%;max-width:400px;margin:0 auto;display:flex;flex-direction:column;align-items:center;}
+.shutter{width:200px;height:200px;border-radius:50%;background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;cursor:pointer;position:relative;transition:transform .15s,border-color .25s;}
+.shutter:active{transform:scale(.95);}
+.shutter .sh-dot{width:54px;height:54px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;transition:all .25s;}
+.shutter .sh-dot::after{content:'';width:38px;height:38px;border-radius:50%;background:var(--accent);opacity:.9;transition:all .25s;}
+.shutter span{font-size:14px;font-weight:600;color:var(--text);}
+.shutter.scanned{border-color:var(--success);}
+.shutter.scanned .sh-dot{border-color:var(--success);}
+.shutter.scanned .sh-dot::after{background:var(--success);border-radius:10px;width:30px;height:16px;}
+.hint{margin-top:26px;font-size:13px;color:var(--text-3);text-align:center;max-width:300px;line-height:1.5;}
+.btn-secondary{margin-top:28px;width:100%;max-width:400px;padding:16px;border-radius:14px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;transition:opacity .2s,transform .12s;letter-spacing:-.01em;}
+.btn-secondary:active{transform:scale(.985);}
+.btn-secondary:disabled{opacity:.35;cursor:default;}
+
+/* CONNECTING */
+#screen-connecting{justify-content:center;align-items:center;text-align:center;padding-bottom:24px;}
+.ring{width:68px;height:68px;margin-bottom:30px;border-radius:50%;border:2.5px solid var(--track);border-top-color:var(--accent);animation:spin .85s linear infinite;position:relative;}
+.ring::after{content:'';position:absolute;inset:6px;border-radius:50%;border:2.5px solid transparent;border-bottom-color:var(--accent);opacity:.4;animation:spin 1.4s linear infinite reverse;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#screen-connecting h2{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:8px;}
+#screen-connecting p{font-size:15px;color:var(--text-2);margin-bottom:30px;min-height:22px;transition:color .2s;}
+.progress-track{width:220px;height:3px;background:var(--track);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width .1s linear;}
+.connect-steps{margin-top:34px;text-align:left;font-size:13.5px;color:var(--text-2);width:100%;max-width:260px;}
+.connect-steps .step-row{padding:7px 0;display:flex;align-items:flex-start;gap:11px;opacity:.3;transition:opacity .35s;min-height:24px;}
+.connect-steps .step-row.done{opacity:1;color:var(--text);}
+.connect-steps .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:6px;transition:background .2s;}
+.connect-steps .step-row.done .dot{background:var(--success);box-shadow:0 0 6px var(--success);}
+.connect-steps .step-row.error{opacity:1;color:var(--danger);}
+.connect-steps .step-row.error .dot{background:var(--danger);box-shadow:0 0 6px var(--danger);}
+.connect-steps .txt-wrap{display:flex;flex-direction:column;gap:2px;}
+.connect-steps .sub{font-size:11px;color:var(--danger);display:none;font-weight:500;margin-top:2px;}
+.connect-steps .step-row.error .sub{display:block;}
+
+/* DASHBOARD */
+#screen-dash{padding-bottom:calc(108px + env(safe-area-inset-bottom));}
+.dash-wrap{width:100%;max-width:440px;margin:0 auto;}
+
+/* Top row removed, replaced with floating battery */
+.battery-indicator{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;position:absolute;top:24px;right:20px;z-index:10;}
+.battery-icon{width:22px;height:11px;border:1.5px solid var(--text-2);border-radius:3px;position:relative;padding:1.5px;}
+.battery-icon::after{content:'';position:absolute;right:-3.5px;top:50%;transform:translateY(-50%);width:2px;height:4px;background:var(--text-2);border-radius:0 1px 1px 0;}
+.battery-fill{height:100%;background:var(--success);border-radius:1px;width:80%;transition:width 1s;}
+
+/* REAL MAP */
+.real-map-wrapper{width:100%;height:240px;border-radius:20px;overflow:hidden;margin-bottom:20px;border:1px solid var(--border);box-shadow:var(--glass-shadow);position:relative;margin-top:10px;}
+#map{width:100%;height:100%;z-index:1;}
+.map-overlay-top{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;pointer-events:none;z-index:400;}
+.map-badge{background:var(--glass);backdrop-filter:blur(12px);color:var(--text);font-size:11px;font-weight:600;padding:6px 10px;border-radius:10px;display:flex;align-items:center;gap:6px;border:1px solid var(--glass-border);box-shadow:0 2px 8px rgba(0,0,0,0.1);pointer-events:auto;}
+.map-badge .dot-live{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:blink 1s infinite;}
+.leaflet-container{background:var(--bg)!important;font-family:inherit!important;}
+.leaflet-bar a{background:var(--card)!important;color:var(--text)!important;border-bottom:1px solid var(--border)!important;}
+.leaflet-bar{border:1px solid var(--border)!important;box-shadow:var(--glass-shadow)!important;}
+[data-theme="dark"] .leaflet-layer{filter:brightness(0.8) contrast(1.1) invert(0.9) hue-rotate(180deg);}
+
+/* SPEEDOMETER WIDGET */
+.speedometer-card{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--glass-shadow);padding:20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;}
+.speedometer-left{display:flex;flex-direction:column;gap:4px;}
+.speedometer-left .k{font-size:12px;color:var(--text-2);font-weight:500;}
+.speedometer-left .v{font-size:42px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
+.speedometer-left .v small{font-size:16px;font-weight:500;color:var(--text-2);margin-left:4px;}
+.speedometer-left .status{font-size:12px;color:var(--accent);font-weight:600;margin-top:2px;transition:color .3s;}
+.speed-gauge{width:80px;height:80px;position:relative;}
+.speed-gauge svg{width:100%;height:100%;transform:rotate(-90deg);}
+.speed-gauge circle{fill:none;stroke-width:6;stroke-linecap:round;}
+.speed-gauge .bg{stroke:var(--track);}
+.speed-gauge .fg{stroke:var(--accent);stroke-dasharray:220;stroke-dashoffset:220;transition:stroke-dashoffset .3s ease-out,stroke .3s;}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.stat{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:18px;box-shadow:var(--glass-shadow);}
+.stat .k{font-size:12px;color:var(--text-2);margin-bottom:8px;letter-spacing:.01em;}
+.stat .v{font-size:30px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1;}
+.stat .v small{font-size:14px;font-weight:500;color:var(--text-2);margin-left:3px;}
+
+.panel{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--glass-shadow);overflow:hidden;margin-bottom:14px;}
+.row{display:flex;align-items:center;justify-content:space-between;padding:17px 18px;border-bottom:1px solid var(--border);}
+.row:last-child{border-bottom:none;}
+.row .row-l{display:flex;flex-direction:column;gap:2px;}
+.row .row-t{font-size:15px;font-weight:500;letter-spacing:-.01em;}
+.row .row-s{font-size:12px;color:var(--text-2);}
+.toggle{width:51px;height:31px;border-radius:16px;background:var(--track);position:relative;cursor:pointer;transition:background .25s;flex-shrink:0;}
+.toggle.on{background:var(--success);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.18);transition:transform .25s;}
+.toggle.on::after{transform:translateX(20px);}
+
+.door-icon{width:28px;height:28px;position:relative;perspective:100px;margin-right:4px;}
+.door-icon .frame{position:absolute;inset:0;border:2px solid var(--text-3);border-radius:4px;border-left:none;transition:border-color .3s;}
+.door-icon .leaf{position:absolute;left:0;top:0;bottom:0;width:50%;background:var(--text-3);border-radius:4px 0 0 4px;transform-origin:left center;transition:transform .4s ease,background .25s;transform:rotateY(0);}
+.row.door-on .door-icon .frame{border-color:var(--success);}
+.row.door-on .door-icon .leaf{transform:rotateY(-70deg);background:var(--success);}
+
+.action-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:17px;border-radius:16px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;transition:transform .12s,filter .2s,background .25s;letter-spacing:-.01em;margin-bottom:14px;}
+.action-btn:active{transform:scale(.985);filter:brightness(1.08);}
+
+/* FINISH BUTTON MOVED INTO PANEL */
+.finish-btn-inline{color:var(--danger);font-weight:600;font-size:15px;background:none;border:none;cursor:pointer;padding:0;}
+.finish-btn-inline:active{opacity:0.7;}
+
+.note{display:flex;gap:10px;padding:14px 16px;background:var(--accent-soft);border-radius:14px;font-size:12.5px;color:var(--text-2);line-height:1.5;margin-top:20px;}
+.note .nd{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:7px;}
+
+/* EVENT LOG */
+.event-log{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--glass-shadow);padding:16px;margin-top:20px;margin-bottom:14px;}
+.event-log .el-title{font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+#event-list{display:flex;flex-direction:column;}
+.event-item{display:flex;gap:10px;font-size:13px;padding:8px 0;color:var(--text-2);border-bottom:1px dashed var(--border);}
+.event-item:last-child{border-bottom:none;}
+.event-time{color:var(--text-3);font-variant-numeric:tabular-nums;flex-shrink:0;font-family:"SF Mono",ui-monospace,monospace;font-size:11px;padding-top:2px;}
+.event-text{color:var(--text);}
+
+/* SETTINGS */
+#screen-settings{align-items:center;}
+.settings-wrap{width:100%;max-width:440px;}
+.settings-wrap .page-head{text-align:left;margin-bottom:20px;}
+.settings-wrap .page-head h2{text-align:left;font-size:30px;}
+.section-title{font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin:26px 0 10px 6px;}
+.group{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:18px;overflow:hidden;box-shadow:var(--glass-shadow);}
+.profile-card{display:flex;align-items:center;gap:14px;padding:18px;}
+.avatar{width:48px;height:48px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:18px;font-weight:600;flex-shrink:0;}
+.profile-info .pname{font-size:16px;font-weight:600;letter-spacing:-.01em;}
+.profile-info .pkey{font-size:12px;color:var(--text-3);margin-top:3px;font-family:"SF Mono",ui-monospace,monospace;letter-spacing:0;}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border);}
+.setting-row:last-child{border-bottom:none;}
+.setting-row .label{font-size:15px;font-weight:500;}
+.segmented{display:flex;background:var(--track);border-radius:9px;padding:2px;}
+.segmented button{padding:6px 14px;border:none;background:transparent;color:var(--text-2);font-size:13px;font-weight:500;font-family:inherit;border-radius:7px;cursor:pointer;transition:background .2s,color .2s;}
+.segmented button.active{background:var(--bg-elev);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08);}
+.version-row{display:flex;justify-content:space-between;padding:15px 18px;font-size:15px;border-bottom:1px solid var(--border);}
+.version-row:last-child{border-bottom:none;}
+.version-row .vval{color:var(--text-2);}
+.logout-btn{width:100%;padding:16px;border-radius:16px;background:var(--card);color:var(--danger);font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:24px;border:1px solid var(--border);transition:transform .12s;}
+.logout-btn:active{transform:scale(.985);}
+
+/* NAV */
+.nav-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));display:flex;gap:3px;padding:5px;background:var(--nav-bg);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:40px;box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:100;transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .35s;}
+.nav-bar.hidden{transform:translateX(-50%) translateY(150px);opacity:0;pointer-events:none;}
+.nav-btn{display:flex;align-items:center;gap:8px;padding:11px 20px;border-radius:30px;background:transparent;border:none;cursor:pointer;color:var(--text-2);font-size:14.5px;font-weight:500;font-family:inherit;transition:background .25s,color .25s;letter-spacing:-.01em;position:relative;}
+.nav-btn .nd-dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.6;display:none;}
+.nav-btn.active{background:var(--accent);color:#fff;}
+.nav-btn.active .nd-dot{opacity:1;}
+
+/* CAMERA */
+.cam-modal{position:fixed;inset:0;z-index:200;background:#000;display:none;flex-direction:column;}
+.cam-modal.open{display:flex;}
+.cam-video-wrap{position:relative;flex:1;overflow:hidden;}
+.cam-video-wrap video{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);min-width:100%;min-height:100%;width:auto;height:auto;object-fit:cover;}
+.cam-overlay{position:absolute;inset:0;pointer-events:none;z-index:3;}
+.cam-frame{position:absolute;border:2px solid rgba(255,255,255,.85);border-radius:14px;pointer-events:none;z-index:3;box-sizing:border-box;transition:left .12s ease-out,top .12s ease-out,width .12s ease-out,height .12s ease-out,border-color .2s,box-shadow .2s;}
+.cam-frame .corner{position:absolute;width:22px;height:22px;border:4px solid #0a84ff;transition:border-color .25s;filter:drop-shadow(0 0 3px rgba(10,132,255,.6));}
+.cam-frame .corner.tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-top-left-radius:14px;}
+.cam-frame .corner.tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-top-right-radius:14px;}
+.cam-frame .corner.bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-bottom-left-radius:14px;}
+.cam-frame .corner.br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-bottom-right-radius:14px;}
+.cam-frame.locked{border-color:#30d158;box-shadow:0 0 0 3px rgba(48,209,88,.4),0 0 28px rgba(48,209,88,.6);}
+.cam-frame.locked .corner{border-color:#30d158;filter:drop-shadow(0 0 4px rgba(48,209,88,.8));}
+.cam-frame .scanline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#0a84ff,transparent);box-shadow:0 0 12px #0a84ff;animation:scanlineMove 1.6s ease-in-out infinite;top:0;opacity:.85;}
+@keyframes scanlineMove{0%,100%{top:4%;}50%{top:96%;}}
+.cam-frame.locked .scanline{display:none;}
+.cam-frame.processing{border-color:#ff9f0a;box-shadow:0 0 0 3px rgba(255,159,10,.4),0 0 28px rgba(255,159,10,.6);}
+.cam-frame.processing .corner{border-color:#ff9f0a;}
+.cam-frame.processing .scanline{display:block;animation:scanlineMove .5s linear infinite;}
+
+.cam-topbar{position:absolute;top:0;left:0;right:0;padding:20px;display:flex;justify-content:space-between;align-items:center;z-index:10;}
+.cam-status-badge{background:rgba(0,0,0,.5);backdrop-filter:blur(12px);color:#fff;font-size:12px;font-weight:600;padding:6px 12px;border-radius:14px;letter-spacing:.02em;display:flex;align-items:center;gap:6px;}
+.cam-status-badge .sb-dot{width:6px;height:6px;border-radius:50%;background:#30d158;}
+.cam-status-badge.searching .sb-dot{background:#ff9f0a;animation:blink 1s infinite;}
+@keyframes blink{50%{opacity:.3;}}
+.cam-close{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.18);backdrop-filter:blur(10px);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:300;line-height:1;}
+.cam-hint{position:absolute;left:0;right:0;bottom:calc(160px + env(safe-area-inset-bottom));text-align:center;color:rgba(255,255,255,.92);font-size:13.5px;font-weight:500;z-index:5;padding:0 24px;text-shadow:0 1px 4px rgba(0,0,0,.6);}
+.cam-bottom{position:absolute;bottom:0;left:0;right:0;padding:24px 0 calc(32px + env(safe-area-inset-bottom));display:flex;justify-content:center;z-index:10;}
+.cam-shoot{width:68px;height:68px;border-radius:50%;background:#fff;border:4px solid rgba(255,255,255,.35);cursor:pointer;transition:transform .12s,box-shadow .3s,opacity .2s;}
+.cam-shoot:active{transform:scale(.9);}
+.cam-shoot:disabled{opacity:.5;cursor:default;}
+.cam-shoot.pulse{animation:shootPulse 1.4s ease-in-out infinite;}
+@keyframes shootPulse{0%,100%{box-shadow:0 0 0 0 rgba(48,209,88,.5);}50%{box-shadow:0 0 0 14px rgba(48,209,88,0);}}
+
+/* MODAL SUMMARY */
+.modal-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-content{background:var(--bg-elev);border-radius:24px;width:100%;max-width:360px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);transform:scale(0.95);opacity:0;transition:transform .3s cubic-bezier(.175,.885,.32,1.275),opacity .3s;border:1px solid var(--border);}
+.modal-overlay.open .modal-content{transform:scale(1);opacity:1;}
+.modal-title{font-size:20px;font-weight:700;text-align:center;margin-bottom:6px;}
+.modal-sub{font-size:13px;color:var(--text-2);text-align:center;margin-bottom:20px;}
+.summary-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);font-size:15px;}
+.summary-row:last-of-type{border-bottom:none;margin-bottom:16px;}
+.summary-row .k{color:var(--text-2);}
+.summary-row .v{font-weight:600;font-variant-numeric:tabular-nums;}
+.modal-close-btn{width:100%;padding:15px;border-radius:14px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:600;cursor:pointer;}
+
+.hidden{display:none !important;}
+</style>
+</head>
+<body data-theme="light">
+
+<div class="screen active" id="screen-auth">
+  <div class="brand">Carshare Access</div>
+  <h1 class="title">Доступ<br>к автомобилю</h1>
+  <p class="subtitle">Введите ключ и имя пользователя, выданные менеджером.</p>
+  <div class="auth-card">
+    <div class="field"><label>Ключ доступа</label><input type="text" id="inp-key" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"></div>
+    <div class="field"><label>Имя пользователя</label><input type="text" id="inp-nick" placeholder="Ваш никнейм" autocomplete="off" spellcheck="false"></div>
+    <button class="btn-primary" id="btn-login" disabled>Активировать</button>
+    <div class="auth-foot">Ключ выдается персонально. Один ключ — одна активная сессия.</div>
+  </div>
+</div>
+
+<div class="screen" id="screen-scan">
+  <div class="page-head"><h2>Сканирование</h2><p>Наведите камеру на номерной знак автомобиля.</p></div>
+  <div class="scan-zone">
+    <div class="shutter" id="shutter"><div class="sh-dot"></div><span>Сфотографировать</span></div>
+    <div class="hint" id="scan-hint">Откроется камера. Номер определяется автоматически.</div>
+    <button class="btn-secondary" id="btn-confirm" disabled>Подтвердить автомобиль</button>
+  </div>
+</div>
+
+<div class="screen" id="screen-connecting">
+  <div class="ring" id="connect-ring"></div>
+  <h2 id="connect-title">Подключение</h2>
+  <p id="connect-sub">Синхронизация с бортовым модулем</p>
+  <div class="progress-track"><div class="progress-fill" id="prog-fill"></div></div>
+  <div class="connect-steps">
+    <div class="step-row" id="step-1"><span class="dot"></span><div class="txt-wrap"><span>Проверка ключа доступа</span><span class="sub">Ошибка валидации</span></div></div>
+    <div class="step-row" id="step-2"><span class="dot"></span><div class="txt-wrap"><span>Сопоставление с номерным знаком</span><span class="sub">Канал занят — ожидание</span></div></div>
+    <div class="step-row" id="step-3"><span class="dot"></span><div class="txt-wrap"><span>Установка защищенного канала</span><span class="sub">Повторное рукопожатие</span></div></div>
+    <div class="step-row" id="step-4"><span class="dot"></span><div class="txt-wrap"><span>Активация управления</span><span class="sub">Синхронизация прервана</span></div></div>
+    <div class="step-row" id="step-5"><span class="dot"></span><div class="txt-wrap"><span>Готово</span></div></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-dash">
+  <div class="dash-wrap">
+    <div class="battery-indicator">
+      <div class="battery-icon"><div class="battery-fill" id="batt-fill"></div></div>
+      <span id="batt-text">85%</span>
+    </div>
+
+    <div class="real-map-wrapper" style="margin-top:0;">
+      <div id="map"></div>
+      <div class="map-overlay-top">
+        <div class="map-badge"><span class="dot-live"></span>GPS активен</div>
+        <div class="map-badge" id="gps-coords">Ожидание...</div>
+      </div>
+    </div>
+
+    <div class="speedometer-card">
+      <div class="speedometer-left">
+        <div class="k">Текущая скорость</div>
+        <div class="v" id="stat-speed">0<small>км/ч</small></div>
+        <div class="status" id="speed-status">Припаркован</div>
+      </div>
+      <div class="speed-gauge">
+        <svg viewBox="0 0 80 80">
+          <circle class="bg" cx="40" cy="40" r="35"></circle>
+          <circle class="fg" id="speed-arc" cx="40" cy="40" r="35"></circle>
+        </svg>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat"><div class="k">Время сессии</div><div class="v" id="stat-time">00:00</div></div>
+      <div class="stat"><div class="k">Начислено</div><div class="v" id="stat-money">0<small>₽</small></div></div>
+      <div class="stat"><div class="k">Пробег</div><div class="v" id="stat-dist">0<small>км</small></div></div>
+      <div class="stat"><div class="k">Тариф</div><div class="v">27<small>₽/мин</small></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" id="row-door">
+        <div class="row-l"><div class="row-t">Открыть дверь</div><div class="row-s">Центральный замок</div></div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="door-icon"><div class="frame"></div><div class="leaf"></div></div>
+          <div class="toggle" data-toggle="door" id="toggle-door"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-l"><div class="row-t">Геозоны</div><div class="row-s">Ограничения по территории</div></div>
+        <div class="toggle on" data-toggle="geo"></div>
+      </div>
+      <div class="row">
+        <div class="row-l"><div class="row-t">GPS-трекер</div><div class="row-s">Передача координат</div></div>
+        <div class="toggle on" data-toggle="gps"></div>
+      </div>
+      <!-- Finish action moved here -->
+      <div class="row" style="border-bottom:none;">
+        <div class="row-l"><div class="row-t" style="color:var(--danger);">Завершить аренду</div><div class="row-s">Досрочное завершение</div></div>
+        <button class="finish-btn-inline" id="btn-finish">Завершить</button>
+      </div>
+    </div>
+
+    <button class="action-btn" id="btn-engine">Запустить двигатель</button>
+
+    <div class="event-log">
+      <div class="el-title">Журнал событий</div>
+      <div id="event-list"></div>
+    </div>
+
+    <div class="note"><span class="nd"></span><span>Оплата производится с корпоративного аккаунта компании. С вашей стороны списания не производятся — тариф 27 ₽/мин отображается для внутренней отчетности.</span></div>
+  </div>
+</div>
+
+<div class="screen" id="screen-settings">
+  <div class="settings-wrap">
+    <div class="page-head"><h2>Настройки</h2></div>
+    <div class="section-title">Профиль</div>
+    <div class="group">
+      <div class="profile-card">
+        <div class="avatar" id="avatar-init">?</div>
+        <div class="profile-info"><div class="pname" id="prof-nick">—</div><div class="pkey" id="prof-key">—</div></div>
+      </div>
+    </div>
+    <div class="section-title">Внешний вид и звук</div>
+    <div class="group">
+      <div class="setting-row"><div class="label">Тема</div><div class="segmented"><button data-theme-btn="light" class="active">Светлая</button><button data-theme-btn="dark">Темная</button></div></div>
+      <div class="setting-row"><div class="label">Язык</div><div class="segmented"><button data-lang-btn="ru" class="active">RU</button><button data-lang-btn="en">EN</button></div></div>
+      <div class="setting-row"><div class="label">Звуки</div><div class="segmented"><button data-sound-btn="on" class="active">Вкл</button><button data-sound-btn="off">Выкл</button></div></div>
+      <div class="setting-row"><div class="label">Вибрация</div><div class="segmented"><button data-vibro-btn="on" class="active">Вкл</button><button data-vibro-btn="off">Выкл</button></div></div>
+    </div>
+    <div class="section-title">О приложении</div>
+    <div class="group">
+      <div class="version-row"><span>Версия</span><span class="vval">1.0</span></div>
+      <div class="version-row"><span>Сборка</span><span class="vval">2026.04.11</span></div>
+    </div>
+    <button class="logout-btn" id="btn-logout">Выйти из сессии</button>
+  </div>
+</div>
+
+<div class="cam-modal" id="cam-modal">
+  <div class="cam-video-wrap">
+    <video id="cam-video" autoplay playsinline muted></video>
+    <div class="cam-overlay">
+      <div class="cam-frame" id="cam-frame">
+        <div class="scanline"></div>
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+      </div>
+    </div>
+    <div class="cam-topbar">
+      <div class="cam-status-badge searching" id="cam-badge"><span class="sb-dot"></span><span id="cam-badge-text">Поиск</span></div>
+      <button class="cam-close" id="cam-close">&times;</button>
+    </div>
+    <div class="cam-hint" id="cam-hint">Наведите на номерной знак</div>
+    <div class="cam-bottom"><button class="cam-shoot" id="cam-shoot"></button></div>
+  </div>
+  <canvas id="cv-src" style="display:none"></canvas>
+</div>
+
+<div class="nav-bar hidden" id="nav-bar">
+  <button class="nav-btn active" data-nav="scan"><span class="nd-dot"></span>Сканирование</button>
+  <button class="nav-btn" data-nav="settings"><span class="nd-dot"></span>Настройки</button>
+</div>
+
+<!-- FINISH MODAL -->
+<div class="modal-overlay" id="finish-modal">
+  <div class="modal-content">
+    <div class="modal-title">Аренда завершена</div>
+    <div class="modal-sub">Не забудьте закрыть автомобиль</div>
+    <div class="summary-row"><span class="k">Время</span><span class="v" id="sum-time">00:00</span></div>
+    <div class="summary-row"><span class="k">Пробег</span><span class="v" id="sum-dist">0 км</span></div>
+    <div class="summary-row"><span class="k">Стоимость</span><span class="v" id="sum-money">0 ₽</span></div>
+    <button class="modal-close-btn" id="modal-close">Вернуться на главную</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const state = {
+    key:'', nick:'', plate:'', scanned:false, connected:false,
+    money:0, seconds:0, lang:'ru', sound:true, vibro:true,
+    timerId:null, moneyTimerId:null, battTimerId:null,
+    speed:0, distance:0, battery:85, lastPosTime: 0,
+    map: null, mapMarker: null, watchId: null, lastLat: null, lastLng: null
+  };
+  const $ = id => document.getElementById(id);
+
+  // ---- Sound + vibration ----
+  let audioCtx = null;
+  function beep(freq, dur, vol, type){
+    if (!state.sound) return;
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type || 'sine';
+      o.frequency.value = freq;
+      g.gain.value = vol || 0.04;
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + dur);
+    } catch(e){}
+  }
+  function vibrate(ms){
+    if (!state.vibro) return;
+    try { if (navigator.vibrate) navigator.vibrate(ms); } catch(e){}
+  }
+
+  function showScreen(name){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = $('screen-'+name); if (el) el.classList.add('active');
+    window.scrollTo(0,0);
+    if (name === 'dash' && state.map) setTimeout(() => state.map.invalidateSize(), 100);
+  }
+  function showNav(on){ $('nav-bar').classList.toggle('hidden', !on); }
+  function setActiveNav(w){ document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === w)); }
+
+  // ---- AUTH ----
+  const inpKey = $('inp-key'), inpNick = $('inp-nick'), btnLogin = $('btn-login');
+  function validateAuth(){ btnLogin.disabled = !(inpKey.value.trim().length>=6 && inpNick.value.trim().length>=2); }
+  inpKey.addEventListener('input', validateAuth);
+  inpNick.addEventListener('input', validateAuth);
+  btnLogin.addEventListener('click', () => {
+    state.key = inpKey.value.trim();
+    state.nick = inpNick.value.trim();
+    $('prof-nick').textContent = state.nick;
+    $('prof-key').textContent = state.key;
+    $('avatar-init').textContent = state.nick.charAt(0).toUpperCase();
+    vibrate(30); beep(880, 0.08, 0.05);
+    showScreen('scan'); showNav(true); setActiveNav('scan');
+  });
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const t = btn.dataset.nav;
+      showScreen(t === 'scan' ? (state.connected ? 'dash' : 'scan') : 'settings');
+      setActiveNav(t);
+    });
+  });
+
+  // ================= CAMERA =================
+  const camModal = $('cam-modal'), camVideo = $('cam-video');
+  const camFrame = $('cam-frame'), camHint = $('cam-hint');
+  const camShoot = $('cam-shoot');
+  const camBadge = $('cam-badge'), camBadgeText = $('cam-badge-text');
+  const cvSrc = $('cv-src');
+
+  let stream = null;
+  let detectRAF = null, detectionActive = false;
+  let cvReady = false, lastDetectTime = 0, frameInitialized = false;
+  let lastBox = null, committed = false;
+
+  const LETTERS = 'АВЕКМНОРСТУХ';
+  const REGIONS = ['77','99','97','177','199','777','197','799','50','150','750','90','190'];
+
+  function waitForOpenCV(cb){
+    if (typeof cv !== 'undefined' && cv.Mat){ cvReady = true; cb(); return; }
+    let tries = 0;
+    const t = setInterval(() => {
+      tries++;
+      if (typeof cv !== 'undefined' && cv.Mat){ clearInterval(t); cvReady = true; cb(); }
+      else if (tries > 300){ clearInterval(t); cb(); }
+    }, 100);
+  }
+
+  function resetFrame(){
+    const wrap = camVideo.parentElement.getBoundingClientRect();
+    const w = wrap.width, h = wrap.height;
+    const fw = Math.min(w * 0.82, 340);
+    const fh = fw / 4.5;
+    camFrame.style.left = ((w - fw) / 2) + 'px';
+    camFrame.style.top = ((h - fh) / 2) + 'px';
+    camFrame.style.width = fw + 'px';
+    camFrame.style.height = fh + 'px';
+    frameInitialized = true;
+  }
+
+  function boxToScreen(box, srcW, srcH){
+    const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+    const wrap = camVideo.parentElement.getBoundingClientRect();
+    const ew = wrap.width, eh = wrap.height;
+    const scale = Math.max(ew / vw, eh / vh);
+    const drawW = vw * scale, drawH = vh * scale;
+    const offX = (ew - drawW) / 2, offY = (eh - drawH) / 2;
+    const sx = vw / srcW, sy = vh / srcH;
+    return {
+      x: offX + box.x * sx * scale,
+      y: offY + box.y * sy * scale,
+      w: box.width * sx * scale,
+      h: box.height * sy * scale
+    };
+  }
+
+  function moveFrameTo(box, srcW, srcH){
+    const s = boxToScreen(box, srcW, srcH);
+    const padX = s.w * 0.06, padY = s.h * 0.10;
+    camFrame.style.left = (s.x - padX) + 'px';
+    camFrame.style.top = (s.y - padY) + 'px';
+    camFrame.style.width = (s.w + padX*2) + 'px';
+    camFrame.style.height = (s.h + padY*2) + 'px';
+  }
+
+  async function openCamera(){
+    camModal.classList.add('open');
+    camFrame.classList.remove('locked','processing');
+    camShoot.classList.remove('pulse');
+    camShoot.disabled = false;
+    camBadge.classList.add('searching');
+    camBadgeText.textContent = 'Поиск';
+    camHint.textContent = 'Наведите на номерной знак';
+    lastBox = null; frameInitialized = false; committed = false;
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} },
+        audio: false
+      });
+      camVideo.srcObject = stream;
+      camVideo.onloadedmetadata = () => {
+        resetFrame();
+        waitForOpenCV(() => startDetection());
+      };
+    } catch(e){
+      camBadgeText.textContent = 'Камера недоступна';
+      camHint.textContent = 'Проверьте разрешения камеры';
+      if (!frameInitialized) setTimeout(resetFrame, 100);
+    }
+  }
+
+  function closeCamera(){
+    camModal.classList.remove('open');
+    detectionActive = false;
+    if (detectRAF){ cancelAnimationFrame(detectRAF); detectRAF = null; }
+    if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+    camVideo.srcObject = null;
+  }
+
+  function captureFrame(targetW){
+    const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+    if (!vw || !vh) return null;
+    const scale = Math.min(1, targetW / vw);
+    const w = Math.round(vw * scale), h = Math.round(vh * scale);
+    if (cvSrc.width !== w || cvSrc.height !== h){ cvSrc.width = w; cvSrc.height = h; }
+    const ctx = cvSrc.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(camVideo, 0, 0, w, h);
+    return { w, h };
+  }
+
+  function detectPlateRect(){
+    if (!cvReady) return null;
+    try {
+      const src = cv.imread(cvSrc);
+      const gray = new cv.Mat();
+      const blur = new cv.Mat();
+      const edges = new cv.Mat();
+      const morph = new cv.Mat();
+      const contours = new cv.MatVector();
+      const hierarchy = new cv.Mat();
+
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
+      cv.Canny(blur, edges, 40, 120);
+      const M = cv.Mat.ones(3, 21, cv.CV_8U);
+      cv.morphologyEx(edges, morph, cv.MORPH_CLOSE, M);
+      cv.findContours(morph, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      const W = cvSrc.width, H = cvSrc.height, totalArea = W * H;
+      let best = null, bestScore = 0;
+
+      for (let i=0; i<contours.size(); i++){
+        const c = contours.get(i);
+        const r = cv.boundingRect(c);
+        const area = r.width * r.height;
+        const ar = r.width / Math.max(1, r.height);
+        if (ar >= 1.8 && ar <= 8.5 && area > totalArea*0.003 && area < totalArea*0.40 &&
+            r.width > W*0.10 && r.height > H*0.02 && r.height < H*0.40){
+          const arScore = 1 - Math.min(1, Math.abs(ar - 4.5) / 4.5);
+          const areaScore = Math.min(1, area / (totalArea * 0.05));
+          const score = arScore*0.6 + areaScore*0.4;
+          if (score > bestScore){ bestScore = score; best = r; }
+        }
+        c.delete();
+      }
+      src.delete(); gray.delete(); blur.delete(); edges.delete(); morph.delete();
+      contours.delete(); hierarchy.delete(); M.delete();
+      return best && bestScore > 0.25 ? best : null;
+    } catch(e){ return null; }
+  }
+
+  function detectionTick(){
+    if (!detectionActive) return;
+    const now = performance.now();
+    if (now - lastDetectTime >= 80 && camVideo.readyState >= 2){
+      lastDetectTime = now;
+      const f = captureFrame(640);
+      if (f){
+        const box = detectPlateRect();
+        if (box){
+          lastBox = box;
+          moveFrameTo(box, f.w, f.h);
+          if (!committed){
+            camBadge.classList.remove('searching');
+            camBadgeText.textContent = 'НЗ в кадре';
+            camFrame.classList.add('locked');
+          }
+        } else {
+          if (frameInitialized && now - (detectionTick._lastReset||0) > 500){
+            resetFrame();
+            detectionTick._lastReset = now;
+          }
+          if (!committed){
+            camBadge.classList.add('searching');
+            camBadgeText.textContent = 'Поиск';
+            camFrame.classList.remove('locked');
+          }
+        }
+      }
+    }
+    if (detectionActive) detectRAF = requestAnimationFrame(detectionTick);
+  }
+
+  function startDetection(){ detectionActive = true; lastDetectTime = 0; detectRAF = requestAnimationFrame(detectionTick); }
+
+  function makePlate(){
+    const r = () => LETTERS[Math.floor(Math.random()*LETTERS.length)];
+    const d = () => Math.floor(Math.random()*10);
+    return r() + d() + d() + d() + r() + r() + ' ' + REGIONS[Math.floor(Math.random()*REGIONS.length)];
+  }
+
+  async function captureAndCommit(){
+    if (committed) return;
+    committed = true;
+    camShoot.disabled = true;
+    vibrate([20, 40, 20]);
+    beep(1200, 0.1, 0.06, 'sine');
+    camFrame.classList.remove('locked');
+    camFrame.classList.add('processing');
+    camBadge.classList.remove('searching');
+    camBadgeText.textContent = 'Распознавание';
+
+    const phrases = ['Определение контуров...','Чтение символов...','Сверка с базой...','Проверка формата...'];
+    let pi = 0;
+    camHint.textContent = phrases[0];
+    const phraseTimer = setInterval(() => {
+      pi++;
+      if (pi < phrases.length) { camHint.textContent = phrases[pi]; beep(600, 0.03, 0.02, 'square'); }
+    }, 450);
+
+    const delay = 1600 + Math.random() * 800;
+    await new Promise(r => setTimeout(r, delay));
+    clearInterval(phraseTimer);
+
+    state.plate = makePlate();
+    state.scanned = true;
+
+    camHint.textContent = 'Номер определён';
+    beep(1400, 0.12, 0.06);
+    vibrate([30, 30, 30]);
+    camFrame.classList.remove('processing');
+    camFrame.classList.add('locked');
+
+    await new Promise(r => setTimeout(r, 600));
+
+    closeCamera();
+    const sh = $('shutter');
+    sh.classList.add('scanned');
+    sh.querySelector('span').textContent = 'Номер захвачен';
+    $('scan-hint').textContent = 'Номерной знак распознан. Подтвердите автомобиль.';
+    $('btn-confirm').disabled = false;
+  }
+
+  $('shutter').addEventListener('click', openCamera);
+  $('cam-close').addEventListener('click', closeCamera);
+  camShoot.addEventListener('click', captureAndCommit);
+
+  $('btn-confirm').addEventListener('click', () => {
+    if (!state.scanned) return;
+    vibrate(30); beep(880, 0.08, 0.04);
+    showNav(false);
+    showScreen('connecting');
+    runConnection();
+  });
+
+  // ===== CONNECTING =====
+  function runConnection(){
+    const fill = $('prog-fill'), title = $('connect-title'), sub = $('connect-sub');
+    const stepIds = ['step-1','step-2','step-3','step-4','step-5'];
+    
+    stepIds.forEach(id => {
+      const el = $(id);
+      el.classList.remove('done','error');
+    });
+    fill.style.width = '0%';
+    title.textContent = 'Подключение';
+    sub.textContent = 'Синхронизация с бортовым модулем';
+
+    let p = 0;
+    const total = 6000 + Math.random() * 3000;
+    const tick = 50;
+    const inc = 100 / (total / tick);
+    let errorTriggered = false;
+
+    const timeoutId = setTimeout(() => { clearInterval(id); finish(); }, total + 2000);
+
+    const id = setInterval(() => {
+      p = Math.min(100, p + inc);
+      fill.style.width = p + '%';
+
+      const stage = Math.floor(p / 20);
+      stepIds.forEach((sid,i) => {
+        if (i < stage || (i === stage && p >= (i+1)*20)) $(sid).classList.add('done');
+      });
+
+      if (!errorTriggered && p > 50 && p < 70 && Math.random() < 0.02){
+        errorTriggered = true;
+        const sIdx = 2 + Math.floor(Math.random()*2);
+        const sEl = $(stepIds[sIdx]);
+        sEl.classList.add('error');
+        beep(300, 0.15, 0.04, 'sawtooth');
+        vibrate([15, 20, 15]);
+        title.textContent = 'Переподключение';
+        sub.textContent = 'Сетевой канал прерван. Повтор...';
+        setTimeout(() => {
+          sEl.classList.remove('error');
+          title.textContent = 'Подключение';
+          sub.textContent = 'Синхронизация с бортовым модулем';
+        }, 2000);
+      }
+
+      if (p >= 100){
+        clearInterval(id);
+        clearTimeout(timeoutId);
+        finish();
+      }
+    }, tick);
+
+    function finish(){
+      if (state.connected) return;
+      fill.style.width = '100%';
+      stepIds.forEach(id => $(id).classList.add('done'));
+      title.textContent = 'Готово';
+      sub.textContent = 'Управление активировано';
+      beep(1200, 0.15, 0.06);
+      vibrate([40, 40, 40]);
+      setTimeout(() => {
+        state.connected = true;
+        showScreen('dash'); showNav(true); setActiveNav('scan');
+        initMap();
+        startSession();
+      }, 600);
+    }
+  }
+
+  // ===== MAP & REAL GPS SPEED =====
+  function initMap(){
+    if (state.map) return;
+    
+    state.map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(state.map);
+
+    const customIcon = L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(10,132,255,.3), 0 2px 8px rgba(10,132,255,.5);position:relative;">
+               <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--accent);opacity:.4;animation:radarPulse 2s ease-out infinite;"></div>
+             </div>`,
+      iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+
+    state.mapMarker = L.marker([55.751244, 37.618423], { icon: customIcon }).addTo(state.map);
+
+    if (navigator.geolocation) {
+      state.watchId = navigator.geolocation.watchPosition((pos) => {
+        const lat = pos.coords.latitude, lng = pos.coords.longitude;
+        const spd = pos.coords.speed;
+        const now = Date.now();
+
+        if (state.mapMarker) state.mapMarker.setLatLng([lat, lng]);
+        $('gps-coords').textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        if (state.map && !state.map._userInteracted) {
+           state.map.panTo([lat, lng], { animate: true, duration: 0.5 });
+        }
+
+        if (state.lastLat !== null && state.lastLng !== null && state.lastPosTime) {
+          const dLat = lat - state.lastLat, dLng = lng - state.lastLng;
+          const distM = Math.sqrt(dLat*dLat + dLng*dLng) * 111320;
+          if (distM < 100 && distM > 1) {
+            state.distance += distM / 1000;
+          }
+        }
+        state.lastLat = lat; state.lastLng = lng; state.lastPosTime = now;
+
+        let kmh = 0;
+        if (spd !== null && spd >= 0) {
+          kmh = spd * 3.6;
+        } else {
+          kmh = Math.random() < 0.8 ? 0 : 30 + Math.random()*20;
+        }
+        state.speed = Math.max(0, kmh);
+
+        updateSpeedUI(state.speed);
+        $('stat-dist').innerHTML = state.distance.toFixed(2) + '<small>км</small>';
+      }, (err) => {
+        $('gps-coords').textContent = 'Нет GPS';
+        if(!state.simSpeedTimer){
+           state.simSpeedTimer = setInterval(() => {
+              state.speed = Math.random() < 0.2 ? 0 : 20 + Math.random()*50;
+              updateSpeedUI(state.speed);
+           }, 1000);
+        }
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    } else {
+      $('gps-coords').textContent = 'GPS не поддерживается';
+    }
+
+    setTimeout(() => state.map.invalidateSize(), 200);
+    state.map.on('dragstart', () => { state.map._userInteracted = true; });
+    state.map.on('zoomstart', () => { state.map._userInteracted = true; });
+  }
+
+  function updateSpeedUI(spd){
+    const rounded = Math.round(spd);
+    $('stat-speed').innerHTML = rounded + '<small>км/ч</small>';
+    
+    const pct = Math.min(1, spd / 180);
+    const dashoffset = 220 - (220 * pct);
+    const arc = $('speed-arc');
+    arc.style.strokeDashoffset = dashoffset;
+    if (spd > 100) arc.style.stroke = 'var(--danger)';
+    else if (spd > 60) arc.style.stroke = '#ff9f0a';
+    else arc.style.stroke = 'var(--accent)';
+
+    const st = $('speed-status');
+    if (rounded === 0) { st.textContent = 'Припаркован'; st.style.color = 'var(--text-3)'; }
+    else if (rounded < 20) { st.textContent = 'Медленно'; st.style.color = 'var(--accent)'; }
+    else if (rounded < 80) { st.textContent = 'В движении'; st.style.color = 'var(--success)'; }
+    else { st.textContent = 'Быстро'; st.style.color = '#ff9f0a'; }
+  }
+
+  // ===== EVENT LOG =====
+  function addEvent(text){
+    const list = $('event-list');
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    const ss = String(now.getSeconds()).padStart(2,'0');
+    const item = document.createElement('div');
+    item.className = 'event-item';
+    item.innerHTML = `<span class="event-time">${hh}:${mm}:${ss}</span><span class="event-text">${text}</span>`;
+    list.prepend(item);
+    while (list.children.length > 6) list.lastChild.remove();
+  }
+
+  // ===== SESSION =====
+  function startSession(){
+    if (state.timerId) return;
+    state.seconds = 0; state.money = 0; state.distance = 0;
+    state.battery = 85;
+    $('batt-fill').style.width = '85%';
+    $('batt-text').textContent = '85%';
+    $('event-list').innerHTML = '';
+    addEvent('Сессия запущена');
+
+    state.timerId = setInterval(() => {
+      state.seconds++;
+      const m = String(Math.floor(state.seconds/60)).padStart(2,'0');
+      const s = String(state.seconds%60).padStart(2,'0');
+      $('stat-time').textContent = m+':'+s;
+    }, 1000);
+
+    state.moneyTimerId = setInterval(() => {
+      state.money += 27/60;
+      $('stat-money').innerHTML = Math.floor(state.money) + '<small>₽</small>';
+    }, 1000);
+
+    state.battTimerId = setInterval(() => {
+      state.battery = Math.max(0, state.battery - (0.05 + Math.random()*0.05));
+      $('batt-fill').style.width = state.battery + '%';
+      $('batt-text').textContent = Math.round(state.battery) + '%';
+      if (state.battery < 20) $('batt-fill').style.background = 'var(--danger)';
+    }, 5000);
+  }
+
+  function stopSession(){
+    clearInterval(state.timerId);
+    clearInterval(state.moneyTimerId);
+    clearInterval(state.battTimerId);
+    clearInterval(state.simSpeedTimer);
+    state.timerId = state.moneyTimerId = state.battTimerId = state.simSpeedTimer = null;
+
+    if (state.watchId && navigator.geolocation) {
+      navigator.geolocation.clearWatch(state.watchId);
+      state.watchId = null;
+    }
+    if (state.map) {
+      state.map.remove();
+      state.map = null;
+      state.mapMarker = null;
+    }
+  }
+
+  // ===== FINISH RENT =====
+  $('btn-finish').addEventListener('click', () => {
+    vibrate([30, 50, 30]);
+    beep(600, 0.15, 0.05, 'sine');
+    
+    const m = String(Math.floor(state.seconds/60)).padStart(2,'0');
+    const s = String(state.seconds%60).padStart(2,'0');
+    $('sum-time').textContent = m + ':' + s;
+    $('sum-dist').textContent = state.distance.toFixed(2) + ' км';
+    $('sum-money').textContent = Math.floor(state.money) + ' ₽';
+
+    $('finish-modal').classList.add('open');
+    stopSession();
+  });
+
+  $('modal-close').addEventListener('click', () => {
+    $('finish-modal').classList.remove('open');
+    state.connected = false;
+    state.scanned = false;
+    const sh = $('shutter');
+    sh.classList.remove('scanned');
+    sh.querySelector('span').textContent = 'Сфотографировать';
+    $('scan-hint').textContent = 'Откроется камера. Номер определяется автоматически.';
+    $('btn-confirm').disabled = true;
+    $('toggle-door').classList.remove('on');
+    $('row-door').classList.remove('door-on');
+    $('btn-engine').textContent = 'Запустить двигатель';
+    $('btn-engine').style.background = 'var(--accent)';
+    engineOn = false;
+    showScreen('scan');
+  });
+
+  // ===== TOGGLES =====
+  document.querySelectorAll('.toggle').forEach(t => {
+    t.addEventListener('click', () => {
+      t.classList.toggle('on');
+      vibrate(15);
+      beep(600, 0.04, 0.03);
+      if (t.dataset.toggle === 'door'){
+        $('row-door').classList.toggle('door-on', t.classList.contains('on'));
+        addEvent(t.classList.contains('on') ? 'Дверь открыта' : 'Дверь закрыта');
+      } else if (t.dataset.toggle === 'geo'){
+        addEvent(t.classList.contains('on') ? 'Геозоны включены' : 'Геозоны отключены');
+      } else if (t.dataset.toggle === 'gps'){
+        addEvent(t.classList.contains('on') ? 'GPS-трекер включен' : 'GPS-трекер отключен');
+      }
+    });
+  });
+
+  // ===== ENGINE =====
+  const btnEngine = $('btn-engine');
+  let engineOn = false;
+  btnEngine.addEventListener('click', () => {
+    engineOn = !engineOn;
+    vibrate(30);
+    beep(engineOn ? 440 : 320, 0.12, 0.05, 'sawtooth');
+    btnEngine.textContent = engineOn ? 'Остановить двигатель' : 'Запустить двигатель';
+    btnEngine.style.background = engineOn ? 'var(--danger)' : 'var(--accent)';
+    addEvent(engineOn ? 'Двигатель запущен' : 'Двигатель остановлен');
+  });
+
+  // ===== THEME / LANG / SOUND / VIBRO =====
+  document.querySelectorAll('[data-theme-btn]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.body.setAttribute('data-theme', b.dataset.themeBtn);
+      document.querySelectorAll('[data-theme-btn]').forEach(x => x.classList.toggle('active', x === b));
+    });
+  });
+  document.querySelectorAll('[data-lang-btn]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.lang = b.dataset.langBtn;
+      document.querySelectorAll('[data-lang-btn]').forEach(x => x.classList.toggle('active', x === b));
+    });
+  });
+  document.querySelectorAll('[data-sound-btn]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.sound = b.dataset.soundBtn === 'on';
+      document.querySelectorAll('[data-sound-btn]').forEach(x => x.classList.toggle('active', x === b));
+      if (state.sound) beep(880, 0.06, 0.04);
+    });
+  });
+  document.querySelectorAll('[data-vibro-btn]').forEach(b => {
+    b.addEventListener('click', () => {
+      state.vibro = b.dataset.vibroBtn === 'on';
+      document.querySelectorAll('[data-vibro-btn]').forEach(x => x.classList.toggle('active', x === b));
+      vibrate(20);
+    });
+  });
+
+  // ===== LOGOUT =====
+  $('btn-logout').addEventListener('click', () => {
+    stopSession();
+    state.connected = false;
+    Object.assign(state, { key:'', nick:'', plate:'', scanned:false, money:0, seconds:0 });
+    inpKey.value = ''; inpNick.value = ''; btnLogin.disabled = true;
+    showScreen('auth'); showNav(false);
+  });
+
+  document.addEventListener('contextmenu', e => { if (e.target.closest('.toggle')) e.preventDefault(); });
+
+})();
+</script>
+</body>
+</html>
