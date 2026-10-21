@@ -9,6 +9,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
+/* Предотвращаем выделение текста (защита от копирования) */
+* { user-select: none !important; -webkit-user-select: none !important; -moz-user-select: none !important; -ms-user-select: none !important; }
+
 :root {
   --bg:#f5f5f7; --bg-elev:#ffffff;
   --text:#1d1d1f; --text-2:#6e6e73; --text-3:#a1a1a6;
@@ -54,8 +57,6 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
 .btn-primary{width:100%;padding:16px;background:var(--accent);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:600;font-family:inherit;cursor:pointer;margin-top:6px;transition:transform .12s,opacity .2s,filter .2s;letter-spacing:-.01em;display:flex;align-items:center;justify-content:center;gap:8px;}
 .btn-primary:active{transform:scale(.985);filter:brightness(1.08);}
 .btn-primary:disabled{opacity:.6;cursor:default;}
-.spinner-small{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:none;}
-@keyframes spin{to{transform:rotate(360deg);}}
 .auth-foot{margin-top:18px;font-size:12px;color:var(--text-3);line-height:1.5;padding:0 6px;}
 
 /* SCAN */
@@ -257,10 +258,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   <div class="auth-card">
     <div class="field"><label>Ключ доступа</label><input type="text" id="inp-key" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false"></div>
     <div class="field"><label>Имя пользователя</label><input type="text" id="inp-nick" placeholder="Ваш никнейм" autocomplete="off" spellcheck="false"></div>
-    <button class="btn-primary" id="btn-login" disabled>
-      <span id="btn-text">Активировать</span>
-      <div class="spinner-small" id="btn-spinner"></div>
-    </button>
+    <button class="btn-primary" id="btn-login">Активировать</button>
     <div class="auth-foot">Ключ выдается персонально. Один ключ — одна активная сессия.</div>
   </div>
 </div>
@@ -422,6 +420,45 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
 <script>
 (function(){
   'use strict';
+
+  // ==========================================
+  // ЗАЩИТА ОТ ВСКРЫТИЯ КОДА (F12, ПКМ, Ctrl+U, и т.д.)
+  // ==========================================
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (
+      e.key === 'F12' || 
+      (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+      (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
+    ) {
+      e.preventDefault();
+      return false;
+    }
+  });
+
+  // ==========================================
+  // ОБФУСЦИРОВАННЫЕ КЛЮЧИ (Разбиты на части)
+  // ==========================================
+  // Части ключей
+  const _kA = ['X7K9M2-P4B8', 'H3J8N1-T6Y2', 'F9J4D7-S1W8', 'B2V6C9-X4Z7'];
+  const _kB = ['Q1Z5V3N9-W2E', 'U9I4O7P5-L2M', 'E3R6T2Y9-H4N', 'A1Q3W8E5-R9T'];
+  const _kC = ['6R4', '8K3', '7B1', '2Y6'];
+  const _kD = ['K1L5M8-P3O6', 'Q4W7E1-R9T5', 'Z8X3C6-V1B5', 'P2O5I8-U4Y1'];
+  const _kE = ['I9U2Y4T7-B8N', 'Y2U8I3O6-A1S', 'N9M2L7K4-J3H', 'T7R3E9W6-Q2A'];
+  const _kF = ['5V2', '4D7', '6G9', '5S8'];
+  
+  // Функция сборки ключей
+  function _buildKeys() {
+    let result = [];
+    for (let i = 0; i < 4; i++) {
+      result.push(_kA[i] + _kB[i] + _kC[i]);
+      result.push(_kD[i] + _kE[i] + _kF[i]);
+    }
+    return result;
+  }
+  const VALID_KEYS = _buildKeys();
+
+
   const state = {
     key:'', nick:'', plate:'', scanned:false, connected:false,
     money:0, seconds:0, lang:'ru', sound:true, vibro:true,
@@ -462,54 +499,36 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   function showNav(on){ $('nav-bar').classList.toggle('hidden', !on); }
   function setActiveNav(w){ document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === w)); }
 
-  // ---- AUTH WITH SERVER (GET PARAM) ----
+  // ---- AUTH ----
   const inpKey = $('inp-key'), inpNick = $('inp-nick'), btnLogin = $('btn-login');
-  const btnText = $('btn-text'), btnSpinner = $('btn-spinner');
 
   function validateAuth(){ 
-    btnLogin.disabled = !(inpKey.value.trim().length === 24 && inpNick.value.trim().length >= 2); 
+    // Разрешаем нажимать кнопку, если введено хотя бы 6 символов ключа и 2 символа ника
+    btnLogin.disabled = !(inpKey.value.trim().length >= 6 && inpNick.value.trim().length >= 2); 
   }
   inpKey.addEventListener('input', validateAuth);
   inpNick.addEventListener('input', validateAuth);
 
-  btnLogin.addEventListener('click', async () => {
-    const key = inpKey.value.trim();
+  btnLogin.addEventListener('click', () => {
+    const key = inpKey.value.trim().toUpperCase();
     const nick = inpNick.value.trim();
-    if (key.length !== 24 || nick.length < 2) return;
+    if (key.length < 6 || nick.length < 2) return;
 
-    // Loading state
-    btnLogin.disabled = true;
-    btnText.textContent = 'Проверка...';
-    btnSpinner.style.display = 'block';
+    // Проверка ключа из массива
+    const isValid = VALID_KEYS.includes(key);
 
-    try {
-      // ОТПРАВЛЯЕМ КЛЮЧ ПРЯМО В ССЫЛКЕ
-      const res = await fetch('/api/check-key?key=' + encodeURIComponent(key), {
-        method: 'POST'
-      });
-      const data = await res.json();
-
-      if (data.valid) {
-        state.key = key;
-        state.nick = nick;
-        $('prof-nick').textContent = nick;
-        $('prof-key').textContent = key;
-        $('avatar-init').textContent = nick.charAt(0).toUpperCase();
-        
-        vibrate(30); beep(880, 0.08, 0.05);
-        showScreen('scan'); showNav(true); setActiveNav('scan');
-      } else {
-        btnLogin.disabled = false;
-        btnText.textContent = 'Активировать';
-        btnSpinner.style.display = 'none';
-        alert('Неверный или заблокированный ключ доступа');
-        beep(300, 0.2, 0.05, 'sawtooth');
-      }
-    } catch (err) {
-      btnLogin.disabled = false;
-      btnText.textContent = 'Активировать';
-      btnSpinner.style.display = 'none';
-      alert('Ошибка соединения с сервером');
+    if (isValid) {
+      state.key = key;
+      state.nick = nick;
+      $('prof-nick').textContent = nick;
+      $('prof-key').textContent = key;
+      $('avatar-init').textContent = nick.charAt(0).toUpperCase();
+      
+      vibrate(30); beep(880, 0.08, 0.05);
+      showScreen('scan'); showNav(true); setActiveNav('scan');
+    } else {
+      alert('Неверный или заблокированный ключ доступа');
+      beep(300, 0.2, 0.05, 'sawtooth');
     }
   });
 
@@ -1078,8 +1097,6 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
     inpKey.value = ''; inpNick.value = ''; btnLogin.disabled = true;
     showScreen('auth'); showNav(false);
   });
-
-  document.addEventListener('contextmenu', e => { if (e.target.closest('.toggle')) e.preventDefault(); });
 
 })();
 </script>
