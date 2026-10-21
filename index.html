@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-/* Предотвращаем выделение текста (защита от копирования) */
+/* Предотвращаем выделение текста */
 * { user-select: none !important; -webkit-user-select: none !important; -moz-user-select: none !important; -ms-user-select: none !important; }
 
 :root {
@@ -114,7 +114,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
 .leaflet-container{background:var(--bg)!important;font-family:inherit!important;}
 .leaflet-bar a{background:var(--card)!important;color:var(--text)!important;border-bottom:1px solid var(--border)!important;}
 .leaflet-bar{border:1px solid var(--border)!important;box-shadow:var(--glass-shadow)!important;}
-[data-theme="dark"] .leaflet-layer{filter:brightness(0.8) contrast(1.1) invert(0.9) hue-rotate(180deg);}
+[data-theme="dark"] .leaflet-tile-pane { filter: brightness(0.8) invert(1) contrast(1.1) hue-rotate(180deg) saturate(0.5); }
 
 /* SPEEDOMETER WIDGET */
 .speedometer-card{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--glass-shadow);padding:20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;}
@@ -422,7 +422,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   'use strict';
 
   // ==========================================
-  // ЗАЩИТА ОТ ВСКРЫТИЯ КОДА (F12, ПКМ, Ctrl+U, и т.д.)
+  // ЗАЩИТА ОТ ВСКРЫТИЯ КОДА
   // ==========================================
   document.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('keydown', e => {
@@ -437,27 +437,20 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   });
 
   // ==========================================
-  // ОБФУСЦИРОВАННЫЕ КЛЮЧИ (Разбиты на части)
+  // ОБФУСЦИРОВАННЫЕ КЛЮЧИ
   // ==========================================
-  // Части ключей
-  const _kA = ['X7K9M2-P4B8', 'H3J8N1-T6Y2', 'F9J4D7-S1W8', 'B2V6C9-X4Z7'];
-  const _kB = ['Q1Z5V3N9-W2E', 'U9I4O7P5-L2M', 'E3R6T2Y9-H4N', 'A1Q3W8E5-R9T'];
-  const _kC = ['6R4', '8K3', '7B1', '2Y6'];
-  const _kD = ['K1L5M8-P3O6', 'Q4W7E1-R9T5', 'Z8X3C6-V1B5', 'P2O5I8-U4Y1'];
-  const _kE = ['I9U2Y4T7-B8N', 'Y2U8I3O6-A1S', 'N9M2L7K4-J3H', 'T7R3E9W6-Q2A'];
-  const _kF = ['5V2', '4D7', '6G9', '5S8'];
+  const _kA = ['X7K9M2-P4B8', 'H3J8N1-T6Y2', 'F9J4D7-S1W8', 'B2V6C9-X4Z7', 'K1L5M8-P3O6', 'Q4W7E1-R9T5', 'Z8X3C6-V1B5', 'P2O5I8-U4Y1'];
+  const _kB = ['Q1Z5V3N9-W2E', 'U9I4O7P5-L2M', 'E3R6T2Y9-H4N', 'A1Q3W8E5-R9T', 'I9U2Y4T7-B8N', 'Y2U8I3O6-A1S', 'N9M2L7K4-J3H', 'T7R3E9W6-Q2A'];
+  const _kC = ['6R4', '8K3', '7B1', '2Y6', '5V2', '4D7', '6G9', '5S8'];
   
-  // Функция сборки ключей
   function _buildKeys() {
     let result = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       result.push(_kA[i] + _kB[i] + _kC[i]);
-      result.push(_kD[i] + _kE[i] + _kF[i]);
     }
     return result;
   }
   const VALID_KEYS = _buildKeys();
-
 
   const state = {
     key:'', nick:'', plate:'', scanned:false, connected:false,
@@ -503,8 +496,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   const inpKey = $('inp-key'), inpNick = $('inp-nick'), btnLogin = $('btn-login');
 
   function validateAuth(){ 
-    // Разрешаем нажимать кнопку, если введено хотя бы 6 символов ключа и 2 символа ника
-    btnLogin.disabled = !(inpKey.value.trim().length >= 6 && inpNick.value.trim().length >= 2); 
+    btnLogin.disabled = !(inpKey.value.trim().length >= 15 && inpNick.value.trim().length >= 2); 
   }
   inpKey.addEventListener('input', validateAuth);
   inpNick.addEventListener('input', validateAuth);
@@ -514,7 +506,6 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
     const nick = inpNick.value.trim();
     if (key.length < 6 || nick.length < 2) return;
 
-    // Проверка ключа из массива
     const isValid = VALID_KEYS.includes(key);
 
     if (isValid) {
@@ -858,7 +849,12 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
     if (state.map) return;
     
     state.map = L.map('map', { zoomControl: false, attributionControl: false }).setView([55.751244, 37.618423], 15);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(state.map);
+    
+    // ИСПОЛЬЗУЕМ НАДЕЖНЫЕ ТАЙЛЫ OPENSTREETMAP
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(state.map);
 
     const customIcon = L.divIcon({
       className: 'custom-div-icon',
@@ -1026,9 +1022,12 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
     $('btn-confirm').disabled = true;
     $('toggle-door').classList.remove('on');
     $('row-door').classList.remove('door-on');
-    $('btn-engine').textContent = 'Запустить двигатель';
-    $('btn-engine').style.background = 'var(--accent)';
-    engineOn = false;
+    
+    const btnEngine = $('btn-engine');
+    btnEngine.textContent = 'Запустить двигатель';
+    btnEngine.style.background = 'var(--accent)';
+    engineOn = false; // Сброс переменной движка
+    
     showScreen('scan');
   });
 
