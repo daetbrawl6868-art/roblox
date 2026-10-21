@@ -462,7 +462,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
   function showNav(on){ $('nav-bar').classList.toggle('hidden', !on); }
   function setActiveNav(w){ document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === w)); }
 
-  // ---- AUTH WITH SERVER ----
+  // ---- AUTH WITH SERVER (GET PARAM) ----
   const inpKey = $('inp-key'), inpNick = $('inp-nick'), btnLogin = $('btn-login');
   const btnText = $('btn-text'), btnSpinner = $('btn-spinner');
 
@@ -483,10 +483,9 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
     btnSpinner.style.display = 'block';
 
     try {
-      const res = await fetch('/api/check-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: key })
+      // ОТПРАВЛЯЕМ КЛЮЧ ПРЯМО В ССЫЛКЕ
+      const res = await fetch('/api/check-key?key=' + encodeURIComponent(key), {
+        method: 'POST'
       });
       const data = await res.json();
 
@@ -496,6 +495,7 @@ p.subtitle{font-size:16px;color:var(--text-2);margin-bottom:44px;max-width:340px
         $('prof-nick').textContent = nick;
         $('prof-key').textContent = key;
         $('avatar-init').textContent = nick.charAt(0).toUpperCase();
+        
         vibrate(30); beep(880, 0.08, 0.05);
         showScreen('scan'); showNav(true); setActiveNav('scan');
       } else {
